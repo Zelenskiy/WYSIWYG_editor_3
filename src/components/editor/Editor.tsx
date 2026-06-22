@@ -4,11 +4,13 @@ import { HtmlPane } from "./HtmlPane";
 import { TableDialog } from "./TableDialog";
 import { LinkDialog } from "./LinkDialog";
 import { TableTools } from "./TableTools";
+import { ImageTools } from "./ImageTools";
 import { inlineStyles } from "../../utils/inlineStyles";
 import { pasteFromWord } from "../../utils/pasteFromWord";
 
 import "./Editor.css";
 import { exportAsZip } from "@/utils/exportZip";
+import SplitPanel from "./splitPanel";
 
 export type ViewMode = "split" | "visual" | "html";
 
@@ -129,6 +131,49 @@ export default function Editor() {
     [syncToHtml],
   );
 
+  const setLineHeight = useCallback(
+    (lh: string) => {
+      const editor = editorRef.current;
+      if (!editor) return;
+      editor.focus();
+      const sel = window.getSelection();
+      if (!sel || sel.rangeCount === 0) return;
+      const range = sel.getRangeAt(0);
+      const BLOCK_TAGS = [
+        "P", "H1", "H2", "H3", "H4", "H5", "H6",
+        "LI", "BLOCKQUOTE", "DIV", "TD", "TH", "PRE",
+      ];
+      const blocks = new Set<HTMLElement>();
+      let node: Node | null = range.startContainer;
+      while (node && node !== editor) {
+        if (
+          node.nodeType === 1 &&
+          BLOCK_TAGS.includes((node as HTMLElement).tagName)
+        ) {
+          blocks.add(node as HTMLElement);
+          break;
+        }
+        node = node.parentNode;
+      }
+      const container =
+        range.commonAncestorContainer.nodeType === 1
+          ? (range.commonAncestorContainer as HTMLElement)
+          : (range.commonAncestorContainer.parentElement as HTMLElement | null);
+      container
+        ?.querySelectorAll(BLOCK_TAGS.join(",").toLowerCase())
+        .forEach((b) => {
+          if (range.intersectsNode(b)) blocks.add(b as HTMLElement);
+        });
+      if (blocks.size === 0) return;
+      blocks.forEach((b) => {
+        if (lh === "") b.style.removeProperty("line-height");
+        else b.style.lineHeight = lh;
+      });
+      syncToHtml();
+    },
+    [syncToHtml],
+  );
+
   const insertImage = useCallback(() => {
     const inp = document.createElement("input");
     inp.type = "file";
@@ -229,15 +274,46 @@ export default function Editor() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode]);
 
-  // Bump tableTick on selection changes so TableTools repositions
   useEffect(() => {
     const handler = () => setTableTick((t) => t + 1);
     document.addEventListener("selectionchange", handler);
     return () => document.removeEventListener("selectionchange", handler);
   }, []);
 
+  const visualPane = (
+    <div className="pane visual-pane">
+      <div className="pane-label">Редагування</div>
+      <div
+        ref={editorRef}
+        className="editor-content"
+        contentEditable
+        suppressContentEditableWarning
+        spellCheck
+        onInput={syncToHtml}
+        onKeyUp={syncToHtml}
+        onMouseUp={() => setTableTick((t) => t + 1)}
+        onPaste={handlePaste}
+        onDrop={handleDrop}
+        onDragOver={(e) => e.preventDefault()}
+      />
+      <TableTools
+        key={tableTick}
+        editorRef={editorRef}
+        onChange={syncToHtml}
+      />
+      <ImageTools editorRef={editorRef} onChange={syncToHtml} />
+    </div>
+  );
+
+  const htmlPane = (
+    <div className="pane html-pane" style={{ height: '100%' }}>
+      <div className="pane-label">HTML-код</div>
+      <HtmlPane value={htmlSource} onChange={handleHtmlChange} />
+    </div>
+  );
+
   return (
-    <div className="editor-app">
+    <div className="editor-app" style={{ display: 'flex', flexDirection: 'column', height: '100vh' }}>
       <header className="header">
         <div className="header-logo">
           <span className="logo-icon">✦</span>
@@ -271,39 +347,18 @@ export default function Editor() {
           setShowLinkDialog(true);
         }}
         onInsertImage={insertImage}
+        onSetLineHeight={setLineHeight}
       />
 
-      <main className={`editor-area mode-${mode}`}>
-        <div className={`pane visual-pane ${mode === "html" ? "hidden" : ""}`}>
-          <div className="pane-label">Редагування</div>
-          <div
-            ref={editorRef}
-            className="editor-content"
-            contentEditable
-            suppressContentEditableWarning
-            spellCheck
-            onInput={syncToHtml}
-            onKeyUp={syncToHtml}
-            onMouseUp={() => setTableTick((t) => t + 1)}
-            onPaste={handlePaste}
-            onDrop={handleDrop}
-            onDragOver={(e) => e.preventDefault()}
+      <main className={`editor-area mode-${mode}`} style={{ flex: 1, overflow: 'hidden', minHeight: 0 }}>
+        {mode === "split" && (
+          <SplitPanel
+            leftBlock={visualPane}
+            rightBlock={htmlPane}
           />
-          {mode !== "html" && (
-            <TableTools
-              key={tableTick}
-              editorRef={editorRef}
-              onChange={syncToHtml}
-            />
-          )}
-        </div>
-
-        {mode === "split" && <div className="pane-divider" />}
-
-        <div className={`pane html-pane ${mode === "visual" ? "hidden" : ""}`}>
-          <div className="pane-label">HTML-код</div>
-          <HtmlPane value={htmlSource} onChange={handleHtmlChange} />
-        </div>
+        )}
+        {mode === "visual" && visualPane}
+        {mode === "html" && htmlPane}
       </main>
 
       {showTableDialog && (

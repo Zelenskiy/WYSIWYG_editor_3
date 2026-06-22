@@ -9,6 +9,7 @@ interface Props {
   onInsertTable: () => void
   onInsertLink: () => void
   onInsertImage: () => void
+  onSetLineHeight: (lh: string) => void
 }
 
 const FONT_SIZES = ['10', '12', '14', '16', '18', '20', '24', '28', '32', '36', '48', '64']
@@ -16,19 +17,21 @@ const FONT_FAMILIES = [
   'Arial', 'Arial Black', 'Comic Sans MS', 'Courier New',
   'Georgia', 'Impact', 'Times New Roman', 'Trebuchet MS', 'Verdana',
 ]
+const LINE_HEIGHTS = ['1', '1.15', '1.5', '1.75', '2', '2.5', '3']
 const COLORS = [
   '#000000','#ffffff','#ff0000','#00aa00','#0000ff','#ff8800',
   '#aa00aa','#00aaaa','#ffff00','#888888','#444444','#cccccc',
   '#4f8ef7','#e74c3c','#2ecc71','#f39c12','#9b59b6','#1abc9c',
 ]
 
-export function Toolbar({ exec, mode, setMode, onInsertTable, onInsertLink, onInsertImage }: Props) {
+export function Toolbar({ exec, mode, setMode, onInsertTable, onInsertLink, onInsertImage, onSetLineHeight }: Props) {
   const [showColorPicker, setShowColorPicker] = useState<'fore' | 'back' | null>(null)
   const [showFontFamily, setShowFontFamily] = useState(false)
   const [showFontSize, setShowFontSize] = useState(false)
+  const [showLineHeight, setShowLineHeight] = useState(false)
 
   const cmd = (c: string, v?: string) => {
-    setShowColorPicker(null); setShowFontFamily(false); setShowFontSize(false)
+    setShowColorPicker(null); setShowFontFamily(false); setShowFontSize(false); setShowLineHeight(false)
     exec(c, v)
   }
 
@@ -224,6 +227,34 @@ export function Toolbar({ exec, mode, setMode, onInsertTable, onInsertLink, onIn
           <Btn title="По ширині" onClick={() => cmd('justifyFull')}>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
           </Btn>
+        </div>
+
+        <Sep />
+
+        {/* Line height */}
+        <div className="tb-group dropdown-wrap">
+          <button
+            className="tb-select"
+            style={{ minWidth: 70 }}
+            onMouseDown={e => { e.preventDefault(); setShowLineHeight(v => !v); setShowFontFamily(false); setShowFontSize(false); setShowColorPicker(null) }}
+            title="Міжрядковий інтервал"
+          >
+            ↕ LH ▾
+          </button>
+          {showLineHeight && (
+            <div className="dropdown" style={{ minWidth: 90 }}>
+              {LINE_HEIGHTS.map(lh => (
+                <button key={lh} className="dropdown-item"
+                  onMouseDown={e => { e.preventDefault(); onSetLineHeight(lh); setShowLineHeight(false) }}>
+                  {lh}
+                </button>
+              ))}
+              <button className="dropdown-item"
+                onMouseDown={e => { e.preventDefault(); onSetLineHeight(''); setShowLineHeight(false) }}>
+                За замовч.
+              </button>
+            </div>
+          )}
         </div>
 
         <Sep />
